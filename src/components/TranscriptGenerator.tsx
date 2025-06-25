@@ -4,14 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Youtube, Download, Copy, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Youtube, Download, Copy, FileText, CheckCircle, AlertCircle, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 const TranscriptGenerator: React.FC = () => {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState('');
+  const [title, setTitle] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const mockTranscript = `Welcome to our comprehensive guide on React development! In this video, we'll explore the fundamental concepts that every developer should master.
 
@@ -34,7 +41,20 @@ Thank you for watching this tutorial! Don't forget to subscribe for more React c
     return youtubeRegex.test(url);
   };
 
+  const extractVideoTitle = (url: string): string => {
+    // Simple title extraction - in a real app, you'd get this from the YouTube API
+    const urlObj = new URL(url);
+    const videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
+    return `YouTube Video - ${videoId}`;
+  };
+
   const handleGenerate = async () => {
+    if (!user) {
+      toast.error('Please sign in to generate transcripts');
+      navigate('/auth');
+      return;
+    }
+
     if (!url.trim()) {
       setError('Please enter a YouTube URL');
       return;
@@ -49,9 +69,11 @@ Thank you for watching this tutorial! Don't forget to subscribe for more React c
     setIsLoading(true);
     setTranscript('');
 
-    // Simulate API call
     try {
+      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 3000));
+      const generatedTitle = extractVideoTitle(url);
+      setTitle(generatedTitle);
       setTranscript(mockTranscript);
       toast.success('Transcript generated successfully!');
     } catch (err) {
@@ -59,6 +81,31 @@ Thank you for watching this tutorial! Don't forget to subscribe for more React c
       toast.error('Failed to generate transcript');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user || !transcript) return;
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('transcripts')
+        .insert({
+          user_id: user.id,
+          video_url: url,
+          title: title || extractVideoTitle(url),
+          transcript: transcript,
+        });
+
+      if (error) throw error;
+
+      toast.success('Transcript saved successfully!');
+    } catch (error) {
+      console.error('Error saving transcript:', error);
+      toast.error('Failed to save transcript');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -96,6 +143,11 @@ Thank you for watching this tutorial! Don't forget to subscribe for more React c
             <p className="text-xl text-muted-foreground">
               Paste any YouTube URL below and get your transcript in seconds
             </p>
+            {!user && (
+              <p className="text-sm text-orange-600 mt-2">
+                Please sign in to generate and save transcripts
+              </p>
+            )}
           </div>
 
           {/* Input Section */}
@@ -158,6 +210,22 @@ Thank you for watching this tutorial! Don't forget to subscribe for more React c
                     Generated Transcript
                   </CardTitle>
                   <div className="flex gap-2">
+                    {user && (
+                      <Button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        variant="default"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                        Save
+                      </Button>
+                    )}
                     <Button
                       onClick={handleCopy}
                       variant="outline"
