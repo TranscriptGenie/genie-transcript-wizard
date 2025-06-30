@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,6 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { YoutubeTranscript } from 'youtube-transcript';
 
 const TranscriptGenerator: React.FC = () => {
   const [url, setUrl] = useState('');
@@ -46,11 +44,6 @@ const TranscriptGenerator: React.FC = () => {
     }
   };
 
-  const extractVideoTitle = (url: string): string => {
-    const videoId = extractVideoId(url);
-    return videoId ? `YouTube Video - ${videoId}` : 'YouTube Video';
-  };
-
   const handleGenerate = async () => {
     if (!user) {
       toast.error('Please sign in to generate transcripts');
@@ -79,42 +72,41 @@ const TranscriptGenerator: React.FC = () => {
     setTranscript('');
 
     try {
-      console.log('Fetching transcript for video ID:', videoId);
+      console.log('Calling YouTube transcript function for video ID:', videoId);
       
-      // Fetch transcript using youtube-transcript
-      const transcriptData = await YoutubeTranscript.fetchTranscript(videoId);
-      
-      // Convert transcript data to readable text
-      const transcriptText = transcriptData
-        .map(item => item.text)
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      const { data, error } = await supabase.functions.invoke('youtube-transcript', {
+        body: { videoId }
+      });
 
-      if (!transcriptText) {
-        throw new Error('No transcript found for this video');
+      if (error) {
+        throw error;
       }
 
-      const generatedTitle = extractVideoTitle(url);
-      setTitle(generatedTitle);
-      setTranscript(transcriptText);
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setTitle(data.title || `YouTube Video - ${videoId}`);
+      setTranscript(data.transcript);
       toast.success('Transcript generated successfully!');
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching transcript:', err);
       
       let errorMessage = 'Failed to generate transcript. ';
       
-      if (err instanceof Error) {
-        if (err.message.includes('transcript')) {
+      if (err.message) {
+        if (err.message.includes('captions') || err.message.includes('subtitles')) {
           errorMessage += 'This video may not have captions available or they may be disabled.';
-        } else if (err.message.includes('private') || err.message.includes('unavailable')) {
+        } else if (err.message.includes('private') || err.message.includes('not found')) {
           errorMessage += 'This video may be private or unavailable.';
+        } else if (err.message.includes('restricted')) {
+          errorMessage += 'This video has restricted access to its subtitles.';
         } else {
-          errorMessage += 'Please check the URL and try again.';
+          errorMessage += err.message;
         }
       } else {
-        errorMessage += 'Please try again.';
+        errorMessage += 'Please check the URL and try again.';
       }
       
       setError(errorMessage);
@@ -134,7 +126,7 @@ const TranscriptGenerator: React.FC = () => {
         .insert({
           user_id: user.id,
           video_url: url,
-          title: title || extractVideoTitle(url),
+          title: title || `YouTube Video - ${extractVideoId(url)}`,
           transcript: transcript,
         });
 
@@ -190,7 +182,6 @@ const TranscriptGenerator: React.FC = () => {
             )}
           </div>
 
-          {/* Input Section */}
           <Card className="mb-8">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -234,13 +225,12 @@ const TranscriptGenerator: React.FC = () => {
               {isLoading && (
                 <div className="flex items-center gap-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Fetching transcript from YouTube...</span>
+                  <span className="text-sm">Fetching transcript from YouTube API...</span>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Output Section */}
           {transcript && (
             <Card>
               <CardHeader>
@@ -311,7 +301,6 @@ const TranscriptGenerator: React.FC = () => {
             </Card>
           )}
 
-          {/* Example URLs */}
           <div className="mt-8 text-center">
             <p className="text-sm text-muted-foreground mb-4">
               Try with these example URLs:
