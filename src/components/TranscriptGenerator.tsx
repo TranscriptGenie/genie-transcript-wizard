@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 const TranscriptGenerator: React.FC = () => {
   const [url, setUrl] = useState('');
@@ -20,32 +21,34 @@ const TranscriptGenerator: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const mockTranscript = `Welcome to our comprehensive guide on React development! In this video, we'll explore the fundamental concepts that every developer should master.
-
-First, let's talk about components. React components are the building blocks of any React application. They allow you to split the UI into independent, reusable pieces, and think about each piece in isolation.
-
-There are two main types of components in React: functional components and class components. Functional components are simpler and are the preferred way to create components in modern React development.
-
-Props are how components communicate with each other. They're read-only and help you pass data from parent to child components. Think of props as function arguments – they're inputs to your component.
-
-State management is crucial for building interactive applications. The useState hook allows functional components to have state. When state changes, React re-renders the component to reflect those changes.
-
-Effects in React handle side effects in your components. The useEffect hook lets you perform data fetching, subscriptions, or manually changing the DOM from React components.
-
-Remember to always keep your components small and focused on a single responsibility. This makes your code more maintainable and easier to test.
-
-Thank you for watching this tutorial! Don't forget to subscribe for more React content and hit the notification bell to stay updated with our latest videos.`;
-
   const isValidYouTubeUrl = (url: string): boolean => {
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
     return youtubeRegex.test(url);
   };
 
+  const extractVideoId = (url: string): string | null => {
+    try {
+      const urlObj = new URL(url);
+      
+      // Handle youtube.com URLs
+      if (urlObj.hostname.includes('youtube.com')) {
+        return urlObj.searchParams.get('v');
+      }
+      
+      // Handle youtu.be URLs
+      if (urlObj.hostname.includes('youtu.be')) {
+        return urlObj.pathname.slice(1);
+      }
+      
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const extractVideoTitle = (url: string): string => {
-    // Simple title extraction - in a real app, you'd get this from the YouTube API
-    const urlObj = new URL(url);
-    const videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
-    return `YouTube Video - ${videoId}`;
+    const videoId = extractVideoId(url);
+    return videoId ? `YouTube Video - ${videoId}` : 'YouTube Video';
   };
 
   const handleGenerate = async () => {
@@ -65,19 +68,56 @@ Thank you for watching this tutorial! Don't forget to subscribe for more React c
       return;
     }
 
+    const videoId = extractVideoId(url);
+    if (!videoId) {
+      setError('Could not extract video ID from URL');
+      return;
+    }
+
     setError('');
     setIsLoading(true);
     setTranscript('');
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('Fetching transcript for video ID:', videoId);
+      
+      // Fetch transcript using youtube-transcript
+      const transcriptData = await YoutubeTranscript.fetchTranscript(videoId);
+      
+      // Convert transcript data to readable text
+      const transcriptText = transcriptData
+        .map(item => item.text)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (!transcriptText) {
+        throw new Error('No transcript found for this video');
+      }
+
       const generatedTitle = extractVideoTitle(url);
       setTitle(generatedTitle);
-      setTranscript(mockTranscript);
+      setTranscript(transcriptText);
       toast.success('Transcript generated successfully!');
+      
     } catch (err) {
-      setError('Failed to generate transcript. Please try again.');
+      console.error('Error fetching transcript:', err);
+      
+      let errorMessage = 'Failed to generate transcript. ';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('transcript')) {
+          errorMessage += 'This video may not have captions available or they may be disabled.';
+        } else if (err.message.includes('private') || err.message.includes('unavailable')) {
+          errorMessage += 'This video may be private or unavailable.';
+        } else {
+          errorMessage += 'Please check the URL and try again.';
+        }
+      } else {
+        errorMessage += 'Please try again.';
+      }
+      
+      setError(errorMessage);
       toast.error('Failed to generate transcript');
     } finally {
       setIsLoading(false);
@@ -194,7 +234,7 @@ Thank you for watching this tutorial! Don't forget to subscribe for more React c
               {isLoading && (
                 <div className="flex items-center gap-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Processing video and generating transcript...</span>
+                  <span className="text-sm">Fetching transcript from YouTube...</span>
                 </div>
               )}
             </CardContent>
