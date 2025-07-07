@@ -1,15 +1,13 @@
-
 import React from 'react';
 import { ArrowRight, Play, Youtube } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
 interface HeroProps {
   onGetStarted: () => void;
 }
-
-const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
-  return (
-    <section id="hero" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pt-20">
+const Hero: React.FC<HeroProps> = ({
+  onGetStarted
+}) => {
+  return <section id="hero" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pt-20">
       <div className="container mx-auto px-4 py-20">
         <div className="max-w-4xl mx-auto text-center animate-fade-in">
           {/* Badge */}
@@ -32,19 +30,11 @@ const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <Button 
-              onClick={onGetStarted}
-              size="lg" 
-              className="bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-700 hover:to-cyan-600 text-white px-8 py-6 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-            >
+            <Button onClick={onGetStarted} size="lg" className=" hover:from-purple-700 hover:to-cyan-600 py-6 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 px-[80px] text-gray-50 bg-sky-500 hover:bg-sky-400">
               Generate Transcript
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button 
-              variant="outline" 
-              size="lg"
-              className="px-8 py-6 text-lg rounded-xl border-2 hover:bg-accent"
-            >
+            <Button variant="outline" size="lg" className="px-8 py-6 text-lg rounded-xl border-2 hover:bg-accent">
               <Play className="mr-2 h-5 w-5" />
               Watch Demo
             </Button>
@@ -91,8 +81,6 @@ const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default Hero;
